@@ -40,6 +40,8 @@ serve(async (req) => {
                   "id": "unique_id",
                   "name": "item_name", 
                   "price": number,
+                  "originalPrice": number | null,
+                  "discount": number | null,
                   "type": "food" | "fee"
                 }
               ],
@@ -52,10 +54,12 @@ serve(async (req) => {
             - Only return valid JSON, no other text
             - Extract ALL line items: food/products AND fees/taxes/service charges
             - Mark food items with "type": "food" and fees/taxes with "type": "fee"
+            - For items with discounts/savings: set "originalPrice" to the original price, "discount" to the discount amount, and "price" to the final discounted price
+            - For items without discounts: set "originalPrice" and "discount" to null, "price" to the actual price
             - For fees, include percentage in name if visible (e.g., "Service Charge (10%)", "Tax (8%)")
-            - Set "hasSubtotal": true if there's a clear subtotal line before fees/taxes
+            - Set "hasSubtotal": true if there's a clear subtotal line before fees/taxes (look for variations like "Sub Total", "Subtotal", "Sub-Total", "Net Amount", "Amount")
             - Set "hasSubtotal": false if fees/taxes are just informational and total already includes them
-            - Include subtotal and total amounts when visible
+            - Include subtotal and total amounts when visible (look for variations like "Total", "Grand Total", "Final Total", "Amount Due", "Total Amount", "Net Total")
             - Do NOT extract subtotals or final totals as line items - only individual items
             - Prices should be numbers (e.g., 12.99, not "$12.99")
             - Generate unique IDs for each item
