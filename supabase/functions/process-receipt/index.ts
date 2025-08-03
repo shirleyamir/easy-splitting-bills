@@ -33,23 +33,27 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a receipt parser. Extract ALL items and charges from receipt images and return a JSON array of objects with this exact structure:
-            [
-              {
-                "id": "unique_id",
-                "name": "item_name",
-                "price": number
-              }
-            ]
+            content: `You are a receipt parser. Extract items from receipt images and return a JSON array with this structure:
+            {
+              "items": [
+                {
+                  "id": "unique_id",
+                  "name": "item_name", 
+                  "price": number,
+                  "type": "food" | "fee"
+                }
+              ]
+            }
             
             Rules:
             - Only return valid JSON, no other text
-            - Extract ALL items including: food/products, taxes, service charges, delivery fees, tips, and any other charges
+            - Extract ALL line items: food/products AND fees/taxes/service charges
+            - Mark food items with "type": "food" and fees/taxes with "type": "fee"
+            - For fees, include percentage in name if visible (e.g., "Service Charge (10%)", "Tax (8%)")
             - Do NOT extract subtotals or final totals - only individual line items
-            - Use descriptive names for items (e.g., "Tax (10%)", "Service Charge", "Delivery Fee")
             - Prices should be numbers (e.g., 12.99, not "$12.99")
             - Generate unique IDs for each item
-            - If you can't read the receipt clearly, return an empty array []`
+            - If you can't read the receipt clearly, return {"items": []}`
           },
           {
             role: 'user',
@@ -81,37 +85,67 @@ serve(async (req) => {
     
     console.log('OpenAI response:', content);
 
-    let items;
+    let parseResult;
     try {
       // Clean the response - remove markdown code blocks if present
       const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      items = JSON.parse(cleanedContent);
+      parseResult = JSON.parse(cleanedContent);
     } catch (parseError) {
       console.error('Failed to parse OpenAI response as JSON:', content);
-      items = [];
+      parseResult = { items: [] };
     }
 
-    // Validate the structure
-    if (!Array.isArray(items)) {
-      items = [];
+    // Extract items from the response
+    let allItems = parseResult.items || parseResult || [];
+    if (!Array.isArray(allItems)) {
+      allItems = [];
     }
 
-    // Ensure each item has the required fields
-    items = items.filter(item => 
+    // Separate food items and fees
+    const foodItems = allItems.filter(item => 
       item && 
       typeof item.name === 'string' && 
       typeof item.price === 'number' && 
-      item.name.trim() !== ''
-    ).map(item => ({
+      item.name.trim() !== '' &&
+      item.type === 'food'
+    );
+
+    const feeItems = allItems.filter(item => 
+      item && 
+      typeof item.name === 'string' && 
+      typeof item.price === 'number' && 
+      item.name.trim() !== '' &&
+      item.type === 'fee'
+    );
+
+    console.log('Food items:', foodItems);
+    console.log('Fee items:', feeItems);
+
+    // Calculate subtotal from food items
+    const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
+    
+    // Calculate fee percentages and apply to food items
+    let adjustedFoodItems = foodItems.map(item => ({
       id: item.id || `item_${Math.random().toString(36).substr(2, 9)}`,
       name: item.name.trim(),
-      price: Math.round(item.price * 100) / 100, // Round to 2 decimal places
+      price: Math.round(item.price * 100) / 100,
       assignedTo: []
     }));
 
-    console.log('Processed items:', items);
+    // Apply fees proportionally to each food item
+    if (subtotal > 0 && feeItems.length > 0) {
+      for (const fee of feeItems) {
+        const feePercentage = fee.price / subtotal;
+        adjustedFoodItems = adjustedFoodItems.map(item => ({
+          ...item,
+          price: Math.round((item.price * (1 + feePercentage)) * 100) / 100
+        }));
+      }
+    }
 
-    return new Response(JSON.stringify({ items }), {
+    console.log('Final processed items:', adjustedFoodItems);
+
+    return new Response(JSON.stringify({ items: adjustedFoodItems }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
