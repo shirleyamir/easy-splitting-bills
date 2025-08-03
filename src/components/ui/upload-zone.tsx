@@ -6,10 +6,11 @@ import { cn } from '@/lib/utils';
 interface UploadZoneProps {
   onFileUpload: (file: File) => void;
   uploadedFile?: File | null;
+  isProcessing?: boolean;
   className?: string;
 }
 
-export const UploadZone = ({ onFileUpload, uploadedFile, className }: UploadZoneProps) => {
+export const UploadZone = ({ onFileUpload, uploadedFile, isProcessing, className }: UploadZoneProps) => {
   const [preview, setPreview] = useState<string | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -51,7 +52,14 @@ export const UploadZone = ({ onFileUpload, uploadedFile, className }: UploadZone
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-sm text-muted-foreground mt-2">Receipt uploaded successfully!</p>
+        {isProcessing ? (
+          <p className="text-sm text-primary mt-2 flex items-center gap-2">
+            <Upload className="h-4 w-4 animate-spin" />
+            Processing receipt with AI...
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-2">Receipt uploaded successfully!</p>
+        )}
       </div>
     );
   }

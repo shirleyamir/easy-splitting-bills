@@ -43,10 +43,12 @@ const Index = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [items, setItems] = useState<ReceiptItem[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleFileUpload = async (file: File | null) => {
     setUploadedFile(file);
     if (file) {
+      setIsProcessing(true);
       try {
         // Convert file to base64
         const reader = new FileReader();
@@ -65,12 +67,14 @@ const Index = () => {
             setItems(data.items || []);
           }
           
+          setIsProcessing(false);
           setCurrentStep(1);
         };
         reader.readAsDataURL(file);
       } catch (error) {
         console.error('Error uploading file:', error);
         setItems([]);
+        setIsProcessing(false);
         setCurrentStep(1);
       }
     } else {
@@ -129,6 +133,7 @@ const Index = () => {
               <UploadZone 
                 onFileUpload={handleFileUpload}
                 uploadedFile={uploadedFile}
+                isProcessing={isProcessing}
               />
 
               {/* Step 2: Add People */}
