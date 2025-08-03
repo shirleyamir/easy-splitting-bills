@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Receipt, DollarSign } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Receipt, DollarSign, Plus, Edit2, Trash2 } from 'lucide-react';
+import { formatCurrency } from '@/components/currency-selector';
 
 interface Person {
   id: string;
@@ -24,6 +27,11 @@ interface ItemAssignmentProps {
 }
 
 export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentProps) => {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<ReceiptItem | null>(null);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemPrice, setNewItemPrice] = useState('');
+
   const togglePersonAssignment = (itemId: string, personId: string) => {
     const updatedItems = items.map(item => {
       if (item.id === itemId) {
@@ -37,6 +45,35 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
       }
       return item;
     });
+    onItemsChange(updatedItems);
+  };
+
+  const addNewItem = () => {
+    if (!newItemName.trim() || !newItemPrice.trim()) return;
+    
+    const newItem: ReceiptItem = {
+      id: `manual_${Date.now()}`,
+      name: newItemName.trim(),
+      price: parseFloat(newItemPrice),
+      assignedTo: []
+    };
+    
+    onItemsChange([...items, newItem]);
+    setNewItemName('');
+    setNewItemPrice('');
+    setIsAddDialogOpen(false);
+  };
+
+  const updateItem = (itemId: string, name: string, price: number) => {
+    const updatedItems = items.map(item =>
+      item.id === itemId ? { ...item, name, price } : item
+    );
+    onItemsChange(updatedItems);
+    setEditingItem(null);
+  };
+
+  const deleteItem = (itemId: string) => {
+    const updatedItems = items.filter(item => item.id !== itemId);
     onItemsChange(updatedItems);
   };
 
@@ -54,22 +91,110 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
 
   return (
     <Card className="p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Receipt className="h-5 w-5 text-primary" />
-        <h3 className="text-lg font-semibold">Assign items to people</h3>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Receipt className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">Assign items to people</h3>
+        </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Item</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Item Name</label>
+                <Input
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="Enter item name"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Price (IDR)</label>
+                <Input
+                  type="number"
+                  value={newItemPrice}
+                  onChange={(e) => setNewItemPrice(e.target.value)}
+                  placeholder="Enter price"
+                />
+              </div>
+              <Button onClick={addNewItem} className="w-full">
+                Add Item
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="space-y-4">
         {items.map((item) => (
           <div key={item.id} className="p-4 bg-muted rounded-lg">
             <div className="flex justify-between items-start mb-3">
-              <div>
-                <h4 className="font-medium">{item.name}</h4>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <DollarSign className="h-3 w-3" />
-                  {item.price.toFixed(2)}
-                </div>
+              <div className="flex-1">
+                {editingItem?.id === item.id ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editingItem.name}
+                      onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
+                      className="font-medium"
+                    />
+                    <Input
+                      type="number"
+                      value={editingItem.price}
+                      onChange={(e) => setEditingItem({...editingItem, price: parseFloat(e.target.value) || 0})}
+                      className="text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        onClick={() => updateItem(item.id, editingItem.name, editingItem.price)}
+                      >
+                        Save
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => setEditingItem(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <h4 className="font-medium">{item.name}</h4>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <DollarSign className="h-3 w-3" />
+                      {formatCurrency(item.price, 'IDR')}
+                    </div>
+                  </>
+                )}
               </div>
+              {editingItem?.id !== item.id && (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingItem(item)}
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteItem(item.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
             </div>
             
             <div className="flex flex-wrap gap-2">

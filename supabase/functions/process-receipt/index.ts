@@ -52,17 +52,21 @@ serve(async (req) => {
             
             Rules:
             - Only return valid JSON, no other text
+            - CAREFULLY examine the ENTIRE receipt and extract EVERY SINGLE line item - scan from top to bottom methodically
+            - Look for items in different sections: appetizers, mains, drinks, desserts, sides, etc.
+            - Pay attention to items that might be listed in different formatting or indentation
             - Extract ALL line items: food/products AND fees/taxes/service charges
             - Mark food items with "type": "food" and fees/taxes with "type": "fee"
             - For items with discounts/savings: set "originalPrice" to the original price, "discount" to the discount amount, and "price" to the final discounted price
             - For items without discounts: set "originalPrice" and "discount" to null, "price" to the actual price
             - For fees, include percentage in name if visible (e.g., "Service Charge (10%)", "Tax (8%)")
-            - Set "hasSubtotal": true if there's a clear subtotal line before fees/taxes (look for variations like "Sub Total", "Subtotal", "Sub-Total", "Net Amount", "Amount")
+            - Set "hasSubtotal": true if there's a clear subtotal line before fees/taxes (look for variations like "Sub Total", "Subtotal", "Sub-Total", "Net Amount", "Amount", "Subtotal Before Tax")
             - Set "hasSubtotal": false if fees/taxes are just informational and total already includes them
-            - Include subtotal and total amounts when visible (look for variations like "Total", "Grand Total", "Final Total", "Amount Due", "Total Amount", "Net Total")
+            - Include subtotal and total amounts when visible (look for variations like "Total", "Grand Total", "Final Total", "Amount Due", "Total Amount", "Net Total", "Bill Total", "Amount Payable")
             - Do NOT extract subtotals or final totals as line items - only individual items
-            - Prices should be numbers (e.g., 12.99, not "$12.99")
+            - Prices should be numbers (e.g., 12.99, not "$12.99" or "Rp 12,500")
             - Generate unique IDs for each item
+            - Double-check that you haven't missed any items by scanning the receipt multiple times
             - If you can't read the receipt clearly, return {"items": [], "hasSubtotal": false, "subtotal": null, "total": null}`
           },
           {
