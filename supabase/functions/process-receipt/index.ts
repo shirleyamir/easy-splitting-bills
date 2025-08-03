@@ -33,7 +33,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a receipt parser. Extract items from receipt images and return a JSON array of objects with this exact structure:
+            content: `You are a receipt parser. Extract ALL items and charges from receipt images and return a JSON array of objects with this exact structure:
             [
               {
                 "id": "unique_id",
@@ -44,8 +44,9 @@ serve(async (req) => {
             
             Rules:
             - Only return valid JSON, no other text
-            - Extract only food/product items, not taxes, tips, or totals
-            - Use descriptive names for items
+            - Extract ALL items including: food/products, taxes, service charges, delivery fees, tips, and any other charges
+            - Do NOT extract subtotals or final totals - only individual line items
+            - Use descriptive names for items (e.g., "Tax (10%)", "Service Charge", "Delivery Fee")
             - Prices should be numbers (e.g., 12.99, not "$12.99")
             - Generate unique IDs for each item
             - If you can't read the receipt clearly, return an empty array []`
@@ -55,7 +56,7 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: 'Please extract all items and their prices from this receipt:'
+                text: 'Please extract all items, taxes, service charges, and fees from this receipt:'
               },
               {
                 type: 'image_url',
