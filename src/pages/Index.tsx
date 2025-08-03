@@ -6,6 +6,7 @@ import { BillSummary } from '@/components/bill-summary';
 import { StepIndicator } from '@/components/step-indicator';
 import { Button } from '@/components/ui/button';
 import { Receipt, Users, Calculator, Share } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import heroImage from '@/assets/hero-image.jpg';
 
 interface Person {
@@ -43,14 +44,35 @@ const Index = () => {
   const [people, setPeople] = useState<Person[]>([]);
   const [items, setItems] = useState<ReceiptItem[]>([]);
 
-  const handleFileUpload = (file: File | null) => {
+  const handleFileUpload = async (file: File | null) => {
     setUploadedFile(file);
     if (file) {
-      // Simulate AI processing - in real app, this would call OpenAI API
-      setTimeout(() => {
-        setItems(MOCK_ITEMS);
+      try {
+        // Convert file to base64
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64Data = reader.result as string;
+          
+          // Call Supabase edge function to process receipt
+          const { data, error } = await supabase.functions.invoke('process-receipt', {
+            body: { imageData: base64Data }
+          });
+
+          if (error) {
+            console.error('Error processing receipt:', error);
+            setItems([]);
+          } else {
+            setItems(data.items || []);
+          }
+          
+          setCurrentStep(1);
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        setItems([]);
         setCurrentStep(1);
-      }, 1500);
+      }
     } else {
       setItems([]);
       setCurrentStep(0);
