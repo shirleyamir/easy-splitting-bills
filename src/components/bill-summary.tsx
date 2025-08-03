@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { Calculator, DollarSign } from 'lucide-react';
+import { Calculator } from 'lucide-react';
+import { formatCurrency } from '@/components/currency-selector';
 
 interface Person {
   id: string;
@@ -18,9 +19,10 @@ interface ReceiptItem {
 interface BillSummaryProps {
   items: ReceiptItem[];
   people: Person[];
+  currency?: string;
 }
 
-export const BillSummary = ({ items, people }: BillSummaryProps) => {
+export const BillSummary = ({ items, people, currency = 'IDR' }: BillSummaryProps) => {
   const calculatePersonTotal = (personId: string) => {
     return items.reduce((total, item) => {
       if (item.assignedTo.includes(personId)) {
@@ -69,9 +71,8 @@ export const BillSummary = ({ items, people }: BillSummaryProps) => {
                 />
                 <span className="font-medium">{person.name}</span>
               </div>
-              <div className="flex items-center gap-1 font-bold">
-                <DollarSign className="h-4 w-4" />
-                {total.toFixed(2)}
+              <div className="font-bold">
+                {formatCurrency(total, currency)}
               </div>
             </div>
           );
@@ -80,24 +81,24 @@ export const BillSummary = ({ items, people }: BillSummaryProps) => {
 
       {/* Totals breakdown */}
       <div className="border-t pt-4 space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Total bill</span>
-          <span>${totalBill.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Assigned</span>
-          <span>${assignedAmount.toFixed(2)}</span>
-        </div>
-        {unassignedAmount > 0 && (
-          <div className="flex justify-between text-sm text-orange-600">
-            <span>Unassigned</span>
-            <span>${unassignedAmount.toFixed(2)}</span>
-          </div>
-        )}
-        <div className="flex justify-between font-bold text-lg pt-2 border-t">
-          <span>Split total</span>
-          <span>${assignedAmount.toFixed(2)}</span>
-        </div>
+         <div className="flex justify-between text-sm">
+           <span className="text-muted-foreground">Total bill</span>
+           <span>{formatCurrency(totalBill, currency)}</span>
+         </div>
+         <div className="flex justify-between text-sm">
+           <span className="text-muted-foreground">Assigned</span>
+           <span>{formatCurrency(assignedAmount, currency)}</span>
+         </div>
+         {unassignedAmount > 0 && (
+           <div className="flex justify-between text-sm text-orange-600">
+             <span>Unassigned</span>
+             <span>{formatCurrency(unassignedAmount, currency)}</span>
+           </div>
+         )}
+         <div className="flex justify-between font-bold text-lg pt-2 border-t">
+           <span>Split total</span>
+           <span>{formatCurrency(assignedAmount, currency)}</span>
+         </div>
       </div>
     </Card>
   );

@@ -3,6 +3,7 @@ import { UploadZone } from '@/components/ui/upload-zone';
 import { PeopleManager } from '@/components/people-manager';
 import { ItemAssignment } from '@/components/item-assignment';
 import { BillSummary } from '@/components/bill-summary';
+import { CurrencySelector } from '@/components/currency-selector';
 import { StepIndicator } from '@/components/step-indicator';
 import { Button } from '@/components/ui/button';
 import { Receipt, Users, Calculator, Share } from 'lucide-react';
@@ -44,6 +45,7 @@ const Index = () => {
   const [people, setPeople] = useState<Person[]>([]);
   const [items, setItems] = useState<ReceiptItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState('IDR');
 
   const handleFileUpload = async (file: File | null) => {
     setUploadedFile(file);
@@ -179,11 +181,22 @@ const Index = () => {
                 />
               )}
 
+              {/* Currency Selector */}
+              {currentStep >= 2 && (
+                <div className="bg-card rounded-lg p-4 border">
+                  <CurrencySelector 
+                    selectedCurrency={selectedCurrency}
+                    onCurrencyChange={setSelectedCurrency}
+                  />
+                </div>
+              )}
+
               {/* Step 4: Bill Summary */}
               {currentStep >= 3 && (
                 <BillSummary 
                   items={items}
                   people={people}
+                  currency={selectedCurrency}
                 />
               )}
             </div>
