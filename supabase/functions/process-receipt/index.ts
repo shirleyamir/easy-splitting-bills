@@ -42,7 +42,10 @@ serve(async (req) => {
                   "price": number,
                   "type": "food" | "fee"
                 }
-              ]
+              ],
+              "hasSubtotal": boolean,
+              "subtotal": number | null,
+              "total": number | null
             }
             
             Rules:
@@ -50,10 +53,13 @@ serve(async (req) => {
             - Extract ALL line items: food/products AND fees/taxes/service charges
             - Mark food items with "type": "food" and fees/taxes with "type": "fee"
             - For fees, include percentage in name if visible (e.g., "Service Charge (10%)", "Tax (8%)")
-            - Do NOT extract subtotals or final totals - only individual line items
+            - Set "hasSubtotal": true if there's a clear subtotal line before fees/taxes
+            - Set "hasSubtotal": false if fees/taxes are just informational and total already includes them
+            - Include subtotal and total amounts when visible
+            - Do NOT extract subtotals or final totals as line items - only individual items
             - Prices should be numbers (e.g., 12.99, not "$12.99")
             - Generate unique IDs for each item
-            - If you can't read the receipt clearly, return {"items": []}`
+            - If you can't read the receipt clearly, return {"items": [], "hasSubtotal": false, "subtotal": null, "total": null}`
           },
           {
             role: 'user',
@@ -120,11 +126,12 @@ serve(async (req) => {
 
     console.log('Food items:', foodItems);
     console.log('Fee items:', feeItems);
+    console.log('Has subtotal:', parseResult.hasSubtotal);
 
     // Calculate subtotal from food items
-    const subtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
+    const calculatedSubtotal = foodItems.reduce((sum, item) => sum + item.price, 0);
     
-    // Calculate fee percentages and apply to food items
+    // Prepare base food items
     let adjustedFoodItems = foodItems.map(item => ({
       id: item.id || `item_${Math.random().toString(36).substr(2, 9)}`,
       name: item.name.trim(),
@@ -132,15 +139,19 @@ serve(async (req) => {
       assignedTo: []
     }));
 
-    // Apply fees proportionally to each food item
-    if (subtotal > 0 && feeItems.length > 0) {
+    // Only apply fees proportionally if there's a clear subtotal structure
+    // If hasSubtotal is false, it means the total already includes taxes/fees
+    if (parseResult.hasSubtotal && calculatedSubtotal > 0 && feeItems.length > 0) {
+      console.log('Applying fees proportionally since subtotal structure detected');
       for (const fee of feeItems) {
-        const feePercentage = fee.price / subtotal;
+        const feePercentage = fee.price / calculatedSubtotal;
         adjustedFoodItems = adjustedFoodItems.map(item => ({
           ...item,
           price: Math.round((item.price * (1 + feePercentage)) * 100) / 100
         }));
       }
+    } else {
+      console.log('Not applying fees - either no subtotal structure or total already includes fees');
     }
 
     console.log('Final processed items:', adjustedFoodItems);
