@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Receipt, DollarSign, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Receipt, DollarSign, Plus, Edit2, Trash2, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/components/currency-selector';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Person {
   id: string;
@@ -31,6 +32,8 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
   const [editingItem, setEditingItem] = useState<ReceiptItem | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationResult, setCalculationResult] = useState<string | null>(null);
 
   const togglePersonAssignment = (itemId: string, personId: string) => {
     const updatedItems = items.map(item => {
@@ -77,6 +80,26 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
     onItemsChange(updatedItems);
   };
 
+  const calculateFinalPrices = async () => {
+    if (items.length === 0) return;
+    
+    setIsCalculating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-final-prices', {
+        body: { items }
+      });
+      
+      if (error) throw error;
+      
+      setCalculationResult(data.calculation);
+    } catch (error) {
+      console.error('Error calculating final prices:', error);
+      setCalculationResult('Error calculating final prices. Please try again.');
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
   if (items.length === 0) {
     return (
       <Card className="p-8 text-center">
@@ -96,7 +119,17 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
           <Receipt className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold">Assign items to people</h3>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <div className="flex gap-2">
+          <Button 
+            variant="secondary" 
+            size="sm"
+            onClick={calculateFinalPrices}
+            disabled={isCalculating || items.length === 0}
+          >
+            <Calculator className="h-4 w-4 mr-2" />
+            {isCalculating ? 'Calculating...' : 'Calculate Final Prices'}
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Plus className="h-4 w-4 mr-2" />
@@ -130,7 +163,8 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+         </Dialog>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -223,8 +257,21 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
               </p>
             )}
           </div>
-        ))}
-      </div>
-    </Card>
+         ))}
+       </div>
+
+       {/* Calculation Result */}
+       {calculationResult && (
+         <div className="mt-6 p-4 bg-secondary rounded-lg">
+           <h4 className="font-semibold mb-2 flex items-center gap-2">
+             <Calculator className="h-4 w-4" />
+             Final Price Calculation
+           </h4>
+           <div className="whitespace-pre-wrap text-sm">
+             {calculationResult}
+           </div>
+         </div>
+       )}
+     </Card>
   );
 };
