@@ -119,6 +119,16 @@ const Index = () => {
               <span className="text-sm">Instant Calculations</span>
             </div>
           </div>
+          
+          {/* Currency Selector in Header */}
+          <div className="mt-8 flex justify-center">
+            <div className="bg-card/80 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+              <CurrencySelector 
+                selectedCurrency={selectedCurrency}
+                onCurrencyChange={setSelectedCurrency}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -181,15 +191,6 @@ const Index = () => {
                 />
               )}
 
-              {/* Currency Selector */}
-              {currentStep >= 2 && (
-                <div className="bg-card rounded-lg p-4 border">
-                  <CurrencySelector 
-                    selectedCurrency={selectedCurrency}
-                    onCurrencyChange={setSelectedCurrency}
-                  />
-                </div>
-              )}
 
               {/* Step 4: Bill Summary */}
               {currentStep >= 3 && (

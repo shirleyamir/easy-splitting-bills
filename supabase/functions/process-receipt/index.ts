@@ -33,7 +33,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a receipt parser. Extract items from receipt images and return a JSON array with this structure:
+            content: `You are a receipt parser specialized in Indonesian receipts. Extract items from receipt images and return a JSON array with this structure:
             {
               "items": [
                 {
@@ -50,6 +50,14 @@ serve(async (req) => {
               "total": number | null
             }
             
+            CRITICAL INDONESIAN CURRENCY RULES:
+            - Indonesian Rupiah (IDR) uses "." as thousands separator and "," as decimal separator
+            - "21.800" means 21,800 (twenty-one thousand eight hundred), NOT 21.8
+            - "1.500" means 1,500 (one thousand five hundred), NOT 1.5  
+            - "12.500" means 12,500 (twelve thousand five hundred), NOT 12.5
+            - If you see a number like "15.000", it means 15,000 IDR
+            - Common price patterns: "5.000" = 5,000 IDR, "25.000" = 25,000 IDR, "150.000" = 150,000 IDR
+            
             Rules:
             - Only return valid JSON, no other text
             - CAREFULLY examine the ENTIRE receipt and extract EVERY SINGLE line item - scan from top to bottom methodically
@@ -64,7 +72,8 @@ serve(async (req) => {
             - Set "hasSubtotal": false if fees/taxes are just informational and total already includes them
             - Include subtotal and total amounts when visible (look for variations like "Total", "Grand Total", "Final Total", "Amount Due", "Total Amount", "Net Total", "Bill Total", "Amount Payable")
             - Do NOT extract subtotals or final totals as line items - only individual items
-            - Prices should be numbers (e.g., 12.99, not "$12.99" or "Rp 12,500")
+            - Prices should be numbers without currency symbols (e.g., 25000, not "Rp 25.000" or "IDR 25,000")
+            - Remember: Indonesian format "25.000" = 25000 in your output
             - Generate unique IDs for each item
             - Double-check that you haven't missed any items by scanning the receipt multiple times
             - If you can't read the receipt clearly, return {"items": [], "hasSubtotal": false, "subtotal": null, "total": null}`
@@ -74,7 +83,7 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: 'Please extract all items, taxes, service charges, and fees from this receipt:'
+                text: 'Please extract all items, taxes, service charges, and fees from this Indonesian receipt. Remember: "25.000" means 25,000 IDR (twenty-five thousand), not 25.0:'
               },
               {
                 type: 'image_url',
