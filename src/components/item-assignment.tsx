@@ -4,9 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Receipt, DollarSign, Plus, Edit2, Trash2, Brain } from 'lucide-react';
+import { Receipt, DollarSign, Plus, Edit2, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/components/currency-selector';
-import { supabase } from '@/integrations/supabase/client';
 
 interface Person {
   id: string;
@@ -32,8 +31,6 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
   const [editingItem, setEditingItem] = useState<ReceiptItem | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
-  const [aiAnalysis, setAiAnalysis] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const togglePersonAssignment = (itemId: string, personId: string) => {
     const updatedItems = items.map(item => {
@@ -80,24 +77,6 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
     onItemsChange(updatedItems);
   };
 
-  const analyzeItemPrices = async () => {
-    if (items.length === 0) return;
-    
-    setIsAnalyzing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('analyze-item-prices', {
-        body: { items }
-      });
-
-      if (error) throw error;
-      setAiAnalysis(data.analysis);
-    } catch (error) {
-      console.error('Error analyzing item prices:', error);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   if (items.length === 0) {
     return (
       <Card className="p-8 text-center">
@@ -117,23 +96,13 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
           <Receipt className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold">Assign items to people</h3>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={analyzeItemPrices}
-            disabled={isAnalyzing || items.length === 0}
-          >
-            <Brain className="h-4 w-4 mr-2" />
-            {isAnalyzing ? 'Analyzing...' : 'AI Analysis'}
-          </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            </DialogTrigger>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Item</DialogTitle>
@@ -162,20 +131,7 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
             </div>
           </DialogContent>
         </Dialog>
-        </div>
       </div>
-
-      {aiAnalysis && (
-        <Card className="p-4 mb-4 bg-muted/50">
-          <div className="flex items-start gap-2">
-            <Brain className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <h4 className="font-medium mb-2">AI Price Analysis</h4>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiAnalysis}</p>
-            </div>
-          </div>
-        </Card>
-      )}
 
       <div className="space-y-4">
         {items.map((item) => (
