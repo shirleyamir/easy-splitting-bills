@@ -170,8 +170,7 @@ export const ItemAssignment = ({ items, people, onItemsChange }: ItemAssignmentP
                 ) : (
                   <>
                     <h4 className="font-medium">{item.name}</h4>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <DollarSign className="h-3 w-3" />
+                    <div className="text-sm text-muted-foreground">
                       {formatCurrency(item.price, 'IDR')}
                     </div>
                   </>
