@@ -33,57 +33,14 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a receipt parser specialized in Indonesian receipts. Extract items from receipt images and return a JSON array with this structure:
-            {
-              "items": [
-                {
-                  "id": "unique_id",
-                  "name": "item_name", 
-                  "price": number,
-                  "originalPrice": number | null,
-                  "discount": number | null,
-                  "type": "food" | "fee"
-                }
-              ],
-              "hasSubtotal": boolean,
-              "subtotal": number | null,
-              "total": number | null
-            }
-            
-            CRITICAL INDONESIAN CURRENCY RULES:
-            - Indonesian Rupiah (IDR) uses "." as thousands separator and "," as decimal separator
-            - "21.800" means 21,800 (twenty-one thousand eight hundred), NOT 21.8
-            - "1.500" means 1,500 (one thousand five hundred), NOT 1.5  
-            - "12.500" means 12,500 (twelve thousand five hundred), NOT 12.5
-            - If you see a number like "15.000", it means 15,000 IDR
-            - Common price patterns: "5.000" = 5,000 IDR, "25.000" = 25,000 IDR, "150.000" = 150,000 IDR
-            
-            Rules:
-            - Only return valid JSON, no other text
-            - CAREFULLY examine the ENTIRE receipt and extract EVERY SINGLE line item - scan from top to bottom methodically
-            - Look for items in different sections: appetizers, mains, drinks, desserts, sides, etc.
-            - Pay attention to items that might be listed in different formatting or indentation
-            - Extract ALL line items: food/products AND fees/taxes/service charges
-            - Mark food items with "type": "food" and fees/taxes with "type": "fee"
-            - For items with discounts/savings: set "originalPrice" to the original price, "discount" to the discount amount, and "price" to the final discounted price
-            - For items without discounts: set "originalPrice" and "discount" to null, "price" to the actual price
-            - For fees, include percentage in name if visible (e.g., "Service Charge (10%)", "Tax (8%)")
-            - Set "hasSubtotal": true if there's a clear subtotal line before fees/taxes (look for variations like "Sub Total", "Subtotal", "Sub-Total", "Net Amount", "Amount", "Subtotal Before Tax")
-            - Set "hasSubtotal": false if fees/taxes are just informational and total already includes them
-            - Include subtotal and total amounts when visible (look for variations like "Total", "Grand Total", "Final Total", "Amount Due", "Total Amount", "Net Total", "Bill Total", "Amount Payable")
-            - Do NOT extract subtotals or final totals as line items - only individual items
-            - Prices should be numbers without currency symbols (e.g., 25000, not "Rp 25.000" or "IDR 25,000")
-            - Remember: Indonesian format "25.000" = 25000 in your output
-            - Generate unique IDs for each item
-            - Double-check that you haven't missed any items by scanning the receipt multiple times
-            - If you can't read the receipt clearly, return {"items": [], "hasSubtotal": false, "subtotal": null, "total": null}`
+            content: `can u tell me the final prices of these items?`
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: 'Please extract all items, taxes, service charges, and fees from this Indonesian receipt. Remember: "25.000" means 25,000 IDR (twenty-five thousand), not 25.0:'
+                text: 'can u tell me the final prices of these items?'
               },
               {
                 type: 'image_url',
@@ -108,14 +65,52 @@ serve(async (req) => {
     
     console.log('OpenAI response:', content);
 
+    // Convert the response to a structured format
     let parseResult;
     try {
-      // Clean the response - remove markdown code blocks if present
+      // Try to parse as JSON first
       const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       parseResult = JSON.parse(cleanedContent);
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response as JSON:', content);
-      parseResult = { items: [] };
+      console.log('Response is not JSON, processing as text:', content);
+      
+      // If not JSON, process the text response to extract items
+      const lines = content.split('\n').filter(line => line.trim() !== '');
+      const items = [];
+      
+      for (const line of lines) {
+        // Look for price patterns in the text
+        const priceMatch = line.match(/(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/);
+        if (priceMatch) {
+          // Convert Indonesian price format to number
+          let price = priceMatch[1].replace(/\./g, '').replace(/,/g, '.');
+          price = parseFloat(price);
+          
+          if (!isNaN(price) && price > 0) {
+            // Extract item name (text before the price)
+            const nameMatch = line.match(/^(.*?)(?:\s+\d)/);
+            const name = nameMatch ? nameMatch[1].trim() : line.replace(priceMatch[0], '').trim();
+            
+            if (name) {
+              items.push({
+                id: `item_${Math.random().toString(36).substr(2, 9)}`,
+                name: name,
+                price: price,
+                originalPrice: null,
+                discount: null,
+                type: 'food'
+              });
+            }
+          }
+        }
+      }
+      
+      parseResult = { 
+        items: items,
+        hasSubtotal: false,
+        subtotal: null,
+        total: null
+      };
     }
 
     // Extract items from the response
