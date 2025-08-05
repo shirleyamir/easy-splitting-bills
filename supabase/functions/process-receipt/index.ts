@@ -2,7 +2,6 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const googleCloudVisionApiKey = Deno.env.get('GOOGLE_CLOUD_VISION_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,177 +20,102 @@ serve(async (req) => {
       throw new Error('No image data provided');
     }
 
-    let content = '';
-    let useOcr = true;
+    console.log('Processing receipt with OpenAI Vision API');
 
-    // Step 1: Try OCR first
-    try {
-      console.log('Processing receipt with Google Cloud Vision OCR');
-      
-      // Convert base64 to just the data part if it includes the data URL prefix
-      const base64Data = imageData.startsWith('data:') ? 
-        imageData.split(',')[1] : imageData;
-
-      const ocrResponse = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${googleCloudVisionApiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          requests: [{
-            image: {
-              content: base64Data
-            },
-            features: [{
-              type: 'TEXT_DETECTION',
-              maxResults: 1
-            }]
-          }]
-        }),
-      });
-
-      if (!ocrResponse.ok) {
-        throw new Error(`OCR API error: ${ocrResponse.status}`);
-      }
-
-      const ocrData = await ocrResponse.json();
-      const extractedText = ocrData.responses[0]?.textAnnotations?.[0]?.description;
-      
-      if (extractedText) {
-        console.log('OCR extracted text:', extractedText);
-        
-        // Step 2: Use GPT-4o to analyze the OCR text
-        console.log('Analyzing OCR text with GPT-4o');
-        
-        const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a receipt parser specialized in Indonesian receipts. Extract items from receipt images and return a JSON array with this structure:
+            {
+              "items": [
+                {
+                  "id": "unique_id",
+                  "name": "item_name", 
+                  "price": number,
+                  "originalPrice": number | null,
+                  "discount": number | null,
+                  "type": "food" | "fee"
+                }
+              ],
+              "hasSubtotal": boolean,
+              "subtotal": number | null,
+              "total": number | null
+            }
+            
+            CRITICAL INDONESIAN CURRENCY RULES:
+            - Indonesian Rupiah (IDR) uses "." as thousands separator and "," as decimal separator
+            - "21.800" means 21,800 (twenty-one thousand eight hundred), NOT 21.8
+            - "1.500" means 1,500 (one thousand five hundred), NOT 1.5  
+            - "12.500" means 12,500 (twelve thousand five hundred), NOT 12.5
+            - If you see a number like "15.000", it means 15,000 IDR
+            - Common price patterns: "5.000" = 5,000 IDR, "25.000" = 25,000 IDR, "150.000" = 150,000 IDR
+            
+            Rules:
+            - Only return valid JSON, no other text
+            - CAREFULLY examine the ENTIRE receipt and extract EVERY SINGLE line item - scan from top to bottom methodically
+            - Look for items in different sections: appetizers, mains, drinks, desserts, sides, etc.
+            - Pay attention to items that might be listed in different formatting or indentation
+            - Extract ALL line items: food/products AND fees/taxes/service charges
+            - Mark food items with "type": "food" and fees/taxes with "type": "fee"
+            - For items with discounts/savings: set "originalPrice" to the original price, "discount" to the discount amount, and "price" to the final discounted price
+            - For items without discounts: set "originalPrice" and "discount" to null, "price" to the actual price
+            - For fees, include percentage in name if visible (e.g., "Service Charge (10%)", "Tax (8%)")
+            - Set "hasSubtotal": true if there's a clear subtotal line before fees/taxes (look for variations like "Sub Total", "Subtotal", "Sub-Total", "Net Amount", "Amount", "Subtotal Before Tax")
+            - Set "hasSubtotal": false if fees/taxes are just informational and total already includes them
+            - Include subtotal and total amounts when visible (look for variations like "Total", "Grand Total", "Final Total", "Amount Due", "Total Amount", "Net Total", "Bill Total", "Amount Payable")
+            - Do NOT extract subtotals or final totals as line items - only individual items
+            - Prices should be numbers without currency symbols (e.g., 25000, not "Rp 25.000" or "IDR 25,000")
+            - Remember: Indonesian format "25.000" = 25000 in your output
+            - Generate unique IDs for each item
+            - Double-check that you haven't missed any items by scanning the receipt multiple times
+            - If you can't read the receipt clearly, return {"items": [], "hasSubtotal": false, "subtotal": null, "total": null}`
           },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [
+          {
+            role: 'user',
+            content: [
               {
-                role: 'system',
-                content: 'You are a receipt parser. Extract items and their final prices from the provided receipt text. Return a JSON array of objects with "name" and "price" fields. Only include actual purchasable items, not taxes, tips, or totals.'
+                type: 'text',
+                text: 'Please extract all items, taxes, service charges, and fees from this Indonesian receipt. Remember: "25.000" means 25,000 IDR (twenty-five thousand), not 25.0:'
               },
               {
-                role: 'user',
-                content: `Parse this receipt text and extract the items with their final prices:\n\n${extractedText}`
-              }
-            ],
-            max_tokens: 1000,
-            temperature: 0.1
-          }),
-        });
-
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          content = aiData.choices[0].message.content;
-          console.log('AI analysis of OCR text:', content);
-        } else {
-          throw new Error('AI analysis failed');
-        }
-      } else {
-        throw new Error('No text extracted from OCR');
-      }
-    } catch (ocrError) {
-      console.log('OCR failed, falling back to vision API:', ocrError.message);
-      useOcr = false;
-      
-      // Fallback: Use GPT-4o Vision API directly
-      console.log('Processing receipt with OpenAI Vision API (fallback)');
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a receipt parser. Extract items and their final prices from the receipt image. Return a JSON array of objects with "name" and "price" fields. Only include actual purchasable items, not taxes, tips, or totals.'
-            },
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: 'Extract the items and their final prices from this receipt image.'
-                },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: imageData
-                  }
+                type: 'image_url',
+                image_url: {
+                  url: imageData
                 }
-              ]
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.1
-        }),
-      });
+              }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.1
+      }),
+    });
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      content = data.choices[0].message.content;
-      console.log('Vision API response:', content);
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    // Convert the response to a structured format
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    
+    console.log('OpenAI response:', content);
+
     let parseResult;
     try {
-      // Try to parse as JSON first
+      // Clean the response - remove markdown code blocks if present
       const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       parseResult = JSON.parse(cleanedContent);
     } catch (parseError) {
-      console.log('Response is not JSON, processing as text:', content);
-      
-      // If not JSON, process the text response to extract items
-      const lines = content.split('\n').filter(line => line.trim() !== '');
-      const items = [];
-      
-      for (const line of lines) {
-        // Look for price patterns in the text
-        const priceMatch = line.match(/(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)/);
-        if (priceMatch) {
-          // Convert Indonesian price format to number
-          let price = priceMatch[1].replace(/\./g, '').replace(/,/g, '.');
-          price = parseFloat(price);
-          
-          if (!isNaN(price) && price > 0) {
-            // Extract item name (text before the price)
-            const nameMatch = line.match(/^(.*?)(?:\s+\d)/);
-            const name = nameMatch ? nameMatch[1].trim() : line.replace(priceMatch[0], '').trim();
-            
-            if (name) {
-              items.push({
-                id: `item_${Math.random().toString(36).substr(2, 9)}`,
-                name: name,
-                price: price,
-                originalPrice: null,
-                discount: null,
-                type: 'food'
-              });
-            }
-          }
-        }
-      }
-      
-      parseResult = { 
-        items: items,
-        hasSubtotal: false,
-        subtotal: null,
-        total: null
-      };
+      console.error('Failed to parse OpenAI response as JSON:', content);
+      parseResult = { items: [] };
     }
 
     // Extract items from the response
